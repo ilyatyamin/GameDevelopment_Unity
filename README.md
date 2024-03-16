@@ -1,2 +1,2 @@
-# GameDevelopment_Unity
-Repo for seminars in Game Development (Unity)
+# Repo for Game Development in Unity
+## Лабораторная работа №1
