@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 784cdacd50a8240f9ae1837c96cb0131, type: 3}
   m_Name: ThirdCard
   m_EditorClassIdentifier: 
-  cardName: 
-  color: 0
-  onSprite: {fileID: 0}
-  offSprite: {fileID: 0}
+  cardName: Card 3
+  color: 1
+  onSprite: {fileID: 21300000, guid: 4db374b7fb3a04713a1bb8087d8ec9c2, type: 3}
+  offSprite: {fileID: 21300000, guid: b97a34d8918404f91ba5c9d900824db0, type: 3}
