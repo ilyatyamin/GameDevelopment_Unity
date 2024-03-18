@@ -1,4 +1,4 @@
-namespace _Source.Resources
+namespace Game
 {
     public class ObservableInt
         {

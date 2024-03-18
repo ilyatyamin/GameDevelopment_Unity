@@ -1,9 +1,8 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
-namespace _Source.Resources
+namespace Game
 {
     public class ResourceVisual : MonoBehaviour
     {

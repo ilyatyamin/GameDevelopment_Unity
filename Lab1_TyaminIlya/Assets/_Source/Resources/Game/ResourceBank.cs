@@ -1,8 +1,7 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace _Source.Resources
+namespace Game
 {
     public class ResourceBank : MonoBehaviour
     {

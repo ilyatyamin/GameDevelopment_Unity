@@ -1,10 +1,9 @@
-using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace _Source.Resources
+namespace Game
 {
     public class ProductionBuyer : MonoBehaviour
     {
