@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -21,27 +22,30 @@ namespace CardGame
         }
 
         private static int _counter = 1;
-        private List<CardLayout> _layouts = new();
+        public List<CardLayout> Layouts = new();
 
         private readonly Dictionary<CardInstance, CardView> _cardDictionary = new(); 
         private List<CardAsset> _initialCards;
-        private int handCapacity;
-        public CardLayout centerLayout;
+        public int HandCapacity;
+        private CardLayout _bucketLayout;
+        public CardLayout CenterLayout;
 
-        public void Init(List<CardLayout> layouts, List<CardAsset> assets, int capacity, CardLayout center)
+        public void Init(List<CardLayout> layouts, List<CardAsset> assets, int capacity, CardLayout center, CardLayout bucket)
         {
-            _layouts = layouts;
+            Layouts = layouts;
             _initialCards = assets;
-            handCapacity = capacity;
-            centerLayout = center;
-
+            HandCapacity = capacity;
+            CenterLayout = center;
+            _bucketLayout = bucket;
+            
+            // При создании игры сразу раскладываем карты, но рубашкой
             StartGame();
         }
 
         private void StartGame()
         {
             // Для каждого игрока создаем CardInstance для каждого CardAsset из начальных карт
-            foreach (var layout in _layouts)
+            foreach (var layout in Layouts)
             {
                 foreach (var cardAsset in _initialCards)
                 {
@@ -52,9 +56,11 @@ namespace CardGame
 
         private void CreateCard(CardAsset asset, int layoutNumber)
         {
+            // Создаем карту с LayoutId, CardPosition при создании рассчитываем как текущее кол-во карт в layout (нумерация с 0)
             var instance = new CardInstance(asset)
             {
-                LayoutId = layoutNumber
+                LayoutId = layoutNumber,
+                CardPosition = Layouts[layoutNumber].NowInLayout++
             };
             CreateCardView(instance);
             MoveToLayout(instance, layoutNumber);
@@ -62,34 +68,76 @@ namespace CardGame
 
         private void CreateCardView(CardInstance instance)
         {
+            // создаем объект на сцене
             GameObject newCardInstance = new GameObject($"Card {_counter++}");
             
+            // добавляем ему компоненты: CardView и Image
             CardView view = newCardInstance.AddComponent<CardView>();
             Image image = newCardInstance.AddComponent<Image>();
             
             view.Init(instance, image);
             
+            // добавляем ему свойство кнопки, чтобы при нажатии на изображение происходило действие
             Button button = newCardInstance.AddComponent<Button>();
+            
+            // добавляем "подписчика"
             button.onClick.AddListener(view.PlayCard);
 
-            instance.AssociatedObject = newCardInstance;
-            newCardInstance.transform.SetParent(_layouts[instance.LayoutId].transform);
+            // устанавливаем ему родителя на сцене
+            newCardInstance.transform.SetParent(Layouts[instance.LayoutId].transform);
 
             _cardDictionary[instance] = view;
         }
-
-        private void MoveToLayout(CardInstance card, int layoutId) // !!!
+        
+        private void MoveToLayout(CardInstance card, int layoutId)
         {
+            int temp = card.LayoutId;
             card.LayoutId = layoutId;
-            card.AssociatedObject.transform.SetParent(_layouts[layoutId].transform);
-            foreach (var layout in _layouts)
-            {
-                layout.Update();
-            }
+            
+            // Устаналиваем нового родителя
+            _cardDictionary[card].transform.SetParent(Layouts[layoutId].transform);
+            
+            // Пересчитываем Layout-ы
+            RecalculateLayout(layoutId);
+            RecalculateLayout(temp);
+        }
+
+        public void MoveToCenter(CardInstance card)
+        {
+            int temp = card.LayoutId;
+            
+            card.LayoutId = CenterLayout.LayoutId;
+            
+            // Устаналиваем нового родителя
+            _cardDictionary[card].transform.SetParent(CenterLayout.transform);
+            
+            // Пересчитываем Layout-ы
+            RecalculateLayout(CenterLayout.LayoutId);
+            RecalculateLayout(temp);
         }
         
-        // Я не использую метод RecalculateLayout, потому что расчитываю сдвиг по дочерним индексам.
-        // Когда один элемент пропадает, то локация других автоматически перерасчитывается и так.
+        public void MoveToTrash(CardInstance card)
+        {
+            int temp = card.LayoutId;
+            card.LayoutId = _bucketLayout.LayoutId;
+            _cardDictionary[card].transform.SetParent(_bucketLayout.transform);
+            
+            // При помещении в сброс будем убирать у карты свойство нажатия 
+            try
+            {
+                Button button = _cardDictionary[card].GetComponent<Button>();
+                button.enabled = false;
+                button.onClick.RemoveAllListeners();
+            }
+            catch (Exception ex)
+            {
+                Debug.Log(ex.Message);
+            }
+
+            // Пересчитываем все id-шники
+            RecalculateLayout(_bucketLayout.LayoutId);
+            RecalculateLayout(temp);
+        }
 
         public List<CardView> GetCardsInLayout(int layoutId)
         {
@@ -103,11 +151,19 @@ namespace CardGame
 
         public void StartTurn()
         {
-            foreach (var layout in _layouts)
+            // Метод для начала хода.
+            foreach (var layout in Layouts)
             {
+                // Перемешиваем значения в layout-е
                 ShuffleLayout(layout.LayoutId);
+                
+                // Поворачиваем карты лицом вверх
+                layout.FaceUp = true;
+                
                 var cards = GetCardsInLayout(layout.LayoutId);
-                for (int i = 0; i < handCapacity; ++i)
+                
+                // Раздаем столько карт, сколько можем
+                for (int i = 0; i < HandCapacity; ++i)
                 {
                     cards[i].StatusOfCard = CardStatus.Hand;
                 }
@@ -118,6 +174,7 @@ namespace CardGame
         {
             var cards = GetInstancesInLayout(layoutId);
 
+            // Делаем список всех пар карт
             List<(int, int)> pairs = new List<(int, int)>();
             for (int i = 0; i < cards.Count; ++i)
             {
@@ -128,11 +185,22 @@ namespace CardGame
             }
 
             Random rnd = new Random();
+            // Устаналиваем "в рандомном порядке"
             pairs = pairs.OrderBy(_ => rnd.Next()).ToList();
 
-            for (int i = 1; i < cards.Count; ++i)
+            for (var i = 1; i < cards.Count; ++i)
             {
-                cards[pairs[i].Item1].AssociatedObject.transform.SetSiblingIndex(pairs[i].Item2);
+                _cardDictionary[cards[pairs[i].Item1]].transform.SetSiblingIndex(pairs[i].Item2);
+            }
+        }
+
+        private void RecalculateLayout(int layoutId)
+        {
+            var games = GetCardsInLayout(layoutId);
+
+            for (int i = 0; i < games.Count; ++i)
+            {
+                games[i].CardPosition = i;
             }
         }
     }
